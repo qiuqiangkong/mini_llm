@@ -1,10 +1,11 @@
-# Minimal Pytorch of GPT2, Llama
+# Minimal PyTorch of GPT2, Llama
 
-This repo provides the minimal Pytorch implementation of GPT2 and Llama.
+This repo provides the minimal PyTorch implementation of GPT2 and Llama.
 
 ## 0. Install dependencies
 
 ```bash
+# Clone the repo
 git clone https://github.com/qiuqiangkong/mini_llm
 
 # Install Python environment
@@ -50,7 +51,7 @@ So fortune
 
 ## External links
 
-Part of code are modified from the following repos.
+This repo is benefited from the following repos.
 
 NanoGPT: https://github.com/karpathy/nanoGPT
 
