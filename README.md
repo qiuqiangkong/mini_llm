@@ -7,6 +7,7 @@ This repo provides the minimal PyTorch implementation of GPT2 and Llama.
 ```bash
 # Clone the repo
 git clone https://github.com/qiuqiangkong/mini_llm
+cd mini_llm
 
 # Install Python environment
 conda create --name llm python=3.10
@@ -31,7 +32,7 @@ We train the languge model on the Shakespeares dataset with 1 million characters
 ## 2. Sample
 
 ```python
-CUDA_VISIBLE_DEVICES=1 python sample.py --model_name=Llama --ckpt_path="checkpoints/train/Llama/step=10000.pth"
+CUDA_VISIBLE_DEVICES=0 python sample.py --model_name=Llama --ckpt_path="checkpoints/train/Llama/step=10000.pth"
 ```
 
 The sampled texts look like:
