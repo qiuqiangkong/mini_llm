@@ -2,13 +2,13 @@
 Modified from https://github.com/karpathy/nanoGPT/blob/master/sample.py
 """
 from __future__ import annotations
-
 import argparse
 from pathlib import Path
 
 import torch
 
-from train import Tokenizer, get_model
+from data.tokenizers import TokenizerChar
+from train import TokenizerChar, get_model
 
 
 def sample(args):
@@ -24,11 +24,11 @@ def sample(args):
     device = "cuda"
 
     # Paths
-    root = "./datasets/shakespeare_char"
+    root = "./assets/shakespeare_char"
     meta_path = Path(root, "meta.pkl")
 
     # Tokenizer
-    tokenizer = Tokenizer(meta_path=meta_path)
+    tokenizer = TokenizerChar(meta_path=meta_path)
 
     # Load model
     model = get_model(model_name=model_name, vocab_size=len(tokenizer))

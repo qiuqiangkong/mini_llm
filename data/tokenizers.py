@@ -1,7 +1,7 @@
 import pickle
 
 
-class Tokenizer:
+class TokenizerChar:
     def __init__(self, meta_path: str) -> None:
         
         with open(meta_path, 'rb') as f:

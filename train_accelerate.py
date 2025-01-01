@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from accelerate import Accelerator
 import wandb
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -17,6 +18,7 @@ from typing_extensions import Literal
 
 from data.shakespeare import ShakespeareChar, load_text_to_ids
 from data.tokenizers import TokenizerChar
+from train import MySampler, get_model, ce_loss, validate
 
 
 def train(args):
@@ -77,17 +79,23 @@ def train(args):
     # Optimizer
     optimizer = optim.AdamW(params=model.parameters(), lr=learning_rate)
 
+    # Prepare for multiprocessing
+    accelerator = Accelerator()
+    
+    model, optimizer, train_dataloader = accelerator.prepare(
+        model, optimizer, train_dataloader)
+
     # Logger
-    if wandb_log:
+    if wandb_log and accelerator.is_main_process:
         wandb.init(project="mini_llm", name="{}".format(model_name))
 
     # Train
     for step, data in enumerate(tqdm(train_dataloader)):
 
         # Move data to device
-        input_ids = data["id"][:, 0 : -1].to(device)  # (b, t)
-        target_ids = data["id"][:, 1 :].to(device)  # (b, t)
-        
+        input_ids = data["id"][:, 0 : -1]  # (b, t)
+        target_ids = data["id"][:, 1 :]  # (b, t)
+
         # Forward
         model.train()
         logits = model(ids=input_ids)  # shape: (b, t, vocab_size)
@@ -97,12 +105,12 @@ def train(args):
         
         # Optimize
         optimizer.zero_grad()  # Reset all parameter.grad to 0
-        loss.backward()  # Update all parameter.grad
+        accelerator.backward(loss)  # Update all parameter.grad
         optimizer.step()  # Update all parameters based on all parameter.grad
 
         # Evaluate
-        if step % test_every_n_steps == 0:
-
+        if step % test_every_n_steps == 0 and accelerator.is_main_process:
+            
             loss_dict = {}
 
             for split in ["train", "val"]:
@@ -110,7 +118,7 @@ def train(args):
                     text_path=text_path,
                     tokenizer=tokenizer,
                     split=split,
-                    model=model,
+                    model=accelerator.unwrap_model(model),
                     seq_len=seq_len
                 )
                 loss_dict[split] = loss
@@ -123,115 +131,16 @@ def train(args):
                     data={"train_loss": loss_dict["train"], "test_loss": loss_dict["val"]},
                     step=step
                 )
-            # from IPython import embed; embed(using=False); os._exit(0)
 
         # Save model
-        if step % save_every_n_steps == 0:
+        if step % save_every_n_steps == 0 and accelerator.is_main_process:
             ckpt_path = Path(ckpts_dir, "step={}.pth".format(step))
-            torch.save(model.state_dict(), ckpt_path)
+            torch.save(accelerator.unwrap_model(model).state_dict(), ckpt_path)
             print("Save model to {}".format(ckpt_path))
 
         if step == training_steps:
             break
-
-
-class MySampler:
-    def __init__(self, books_num: int):
-        self.books_num = books_num
         
-    def __iter__(self) -> int:
-        while True:
-            yield random.randint(a=0, b=self.books_num)
-
-
-def get_model(model_name: str, vocab_size: int) -> nn.Module:
-
-    if model_name == "GPT2":
-        from models.gpt2 import GPTConfig, GPT2
-        config = GPTConfig(
-            block_size=1024,
-            vocab_size=vocab_size,
-            n_layer=12,
-            n_head=12,
-            n_embd=768
-        )
-        return GPT2(config=config)
-
-    elif model_name == "Llama":
-        from models.llama import LlamaConfig, Llama
-        config = LlamaConfig(
-            block_size=1024,
-            vocab_size=vocab_size,
-            n_layer=12,
-            n_head=12,
-            n_embd=768
-        )
-        return Llama(config=config)
-
-    else:
-        raise ValueError(model_name)
-
-
-def ce_loss(output: torch.Tensor, target: torch.LongTensor) -> float:
-    r"""Cross entropy loss.
-
-    Args:
-        output: (b, t, vocab_size)
-        target: (b, t)
-
-    Outputs:
-        loss: torch.float
-    """
-
-    B, T, V = output.shape
-
-    loss = F.cross_entropy(
-        input=output.flatten(0, 1),  # shape: (b*t, vocab_size)
-        target=target.flatten(0, 1),  # shape: (b*t,)
-        ignore_index=-1
-    )
-
-    return loss
-
-
-def validate(
-    text_path: str,
-    tokenizer: object,
-    split: Literal["train", "val"],
-    model: nn.Module,
-    seq_len: int,
-    valid_steps: int = 100
-) -> float:
-    r"""Validate the model on part of data."""
-
-    device = next(model.parameters()).device
-
-    # Load tokens
-    ids = load_text_to_ids(text_path=text_path, tokenizer=tokenizer, split=split)
-
-    losses = []
-
-    # Sample indexes from the beginning
-    for i in range(valid_steps):
-
-        # Fetch data
-        bgn = i * seq_len
-        end = (i + 1) * seq_len + 1
-        clip_ids = ids[bgn : end]  # shape: (t + 1,)
-
-        input_ids = torch.LongTensor(clip_ids[None, 0 : -1]).to(device)  # (b, t)
-        target_ids = torch.LongTensor(clip_ids[None, 1 :]).to(device)  # (b, t)
-
-        # Forward
-        with torch.no_grad():
-            model.eval()
-            logits = model(ids=input_ids)  # shape: (b, t, vocab_size)
-
-        # Calculate loss
-        loss = ce_loss(output=logits, target=target_ids)
-        losses.append(loss.item())
-
-    return np.mean(losses)
 
 
 if __name__ == "__main__":

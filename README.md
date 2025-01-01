@@ -29,6 +29,16 @@ We train the languge model on the Shakespeares dataset with 1 million characters
 
 ![Training & Validation Loss](assets/loss.png)
 
+### Train on Multiple GPUs.
+
+We use Huggingface accelerate library to train the systems on multiple GPUs. train_accelerate.py just adds a few lines to train.py. Here is an example to run with 4 GPUs:
+
+```python
+CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --multi_gpu --num_processes 4 train_accelerate.py --model_name=Llama
+```
+
+<!-- # Using mutliple GPUs can greatly accelerate the training of LLMs. -->
+
 ## 2. Sample
 
 ```python
