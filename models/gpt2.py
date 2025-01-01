@@ -30,7 +30,7 @@ class GPT2(nn.Module):
         
         self.config = config
 
-        # word text embedding (wte) and word position embedding (wpe)
+        # Word to embedding (wte) and word position embedding (wpe)
         self.wte = nn.Embedding(config.vocab_size, config.n_embd)
         self.wpe = nn.Embedding(config.block_size, config.n_embd)
         self.drop = nn.Dropout(config.dropout)
@@ -61,8 +61,8 @@ class GPT2(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, tokens: torch.LongTensor) -> torch.LongTensor:
-        r"""Next token prediction with GPT2.
+    def forward(self, ids: torch.LongTensor) -> torch.LongTensor:
+        r"""Next id prediction with GPT2.
 
         b: batch_size
         t: time_steps
@@ -70,24 +70,24 @@ class GPT2(nn.Module):
         v: vocab_size
 
         Args:
-            tokens: (b, t)
+            ids: (b, t)
 
         Outputs:
             logits: (b, t, v)
         """
 
-        device = tokens.device
-        B, T = tokens.shape
+        device = ids.device
+        B, T = ids.shape
 
         assert T <= self.config.block_size, "Can not forward sequence of {T} > {self.config.block_size}"
 
         # Absolute positions
         pos = torch.arange(0, T, dtype=torch.long, device=device)  # shape: (t,)
 
-        # Token embedding and position embedding
-        tok_emb = self.wte(tokens)  # shape: (b, t, d)
+        # ID embedding and position embedding
+        id_emb = self.wte(ids)  # shape: (b, t, d)
         pos_emb = self.wpe(pos)  # shape: (t, d)
-        x = self.drop(tok_emb + pos_emb)  # shape; (b, t, d)
+        x = self.drop(id_emb + pos_emb)  # shape; (b, t, d)
 
         # Transformer
         for block in self.blocks:
@@ -103,37 +103,38 @@ class GPT2(nn.Module):
     @torch.no_grad()
     def generate(
         self, 
-        tokens: torch.LongTensor, 
-        max_new_tokens: int, 
+        ids: torch.LongTensor, 
+        max_new_ids: int, 
         temperature: float = 1.0, 
         top_k: None | int = None
     ):
-        r"""
-        Next token sampling with auto-regression. Make sure to use model.eval()
+        r"""Next ID sampling with auto-regression. Make sure to use model.eval()
 
         b: batch_size
         t: time_steps
         v: vocab_size
 
         Args:
-            tokens: (b, 1)
-            max_new_tokens: int
+            ids: (b, 1)
+            max_new_ids: int
             temperature: float
             top_k: None | int
 
         Returns:
-            tokens: (b, t)
+            new_ids: (b, t), sampled IDs
         """
-        for _ in range(max_new_tokens):
+        input_len = ids.shape[1]
+
+        for _ in range(max_new_ids):
 
             # If the sequence context is growing too long we must crop it at block_size
-            if tokens.shape[1] <= self.config.block_size:
-                prev_tokens = tokens
+            if ids.shape[1] <= self.config.block_size:
+                prev_ids = ids
             else:
-                prev_tokens = tokens[:, -self.config.block_size:]
+                prev_ids = ids[:, -self.config.block_size:]
 
             # Forward
-            logits = self(prev_tokens)  # shape: (b, t, v)
+            logits = self(prev_ids)  # shape: (b, t, v)
 
             # Take the final step logits
             logits = logits[:, -1, :] / temperature  # shape: (b, v)
@@ -146,13 +147,15 @@ class GPT2(nn.Module):
             # Convert logits to probabilities
             probs = F.softmax(logits, dim=-1)  # shape: (b, v)
 
-            # Sample the next token
-            next_token = torch.multinomial(probs, num_samples=1)  # shape: (b, 1)
+            # Sample the next ID
+            next_id = torch.multinomial(probs, num_samples=1)  # shape: (b, 1)
 
-            # Append the sampled token to the running tokens and continue
-            tokens = torch.cat((tokens, next_token), dim=1)  # shape: (b, t)
+            # Append the sampled ID to the running IDs and continue
+            ids = torch.cat((ids, next_id), dim=1)  # shape: (b, t)
 
-        return tokens
+        new_ids = ids[:, input_len:]  # shape: (b, t)
+
+        return new_ids
 
 
 class LayerNorm(nn.Module):

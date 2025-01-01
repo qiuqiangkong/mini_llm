@@ -15,7 +15,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing_extensions import Literal
 
-from data.shakespeare import ShakespeareChar, load_text_to_tokens
+from data.shakespeare import ShakespeareChar, load_text_to_ids
+from tokenizers import Tokenizer
 
 
 def train(args):
@@ -70,11 +71,11 @@ def train(args):
     )
 
     # Model
-    model = get_model(model_name)
+    model = get_model(model_name=model_name, vocab_size=len(tokenizer))
     model.to(device)
 
     # Optimizer
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
+    optimizer = optim.AdamW(params=model.parameters(), lr=learning_rate)
 
     if wandb_log:
         wandb.init(project="mini_llm", name="{}".format(model_name))
@@ -83,15 +84,15 @@ def train(args):
     for step, data in enumerate(tqdm(train_dataloader)):
 
         # Move data to device
-        input_tokens = data["input"].to(device)  # (b, t)
-        target_tokens = data["target"].to(device)  # (b, t)
+        input_ids = data["id"][0 : -1].to(device)  # (b, t)
+        target_ids = data["id"][1 :].to(device)  # (b, t)
 
         # Forward
         model.train()
-        output = model(tokens=input_tokens)  # shape: (b, t, vocab_size)
+        logits = model(ids=input_ids)  # shape: (b, t, vocab_size)
 
         # Loss
-        loss = bce_loss(output=output, target=target_tokens)
+        loss = ce_loss(output=logits, target=target_ids)
         
         # Optimize
         optimizer.zero_grad()   # Reset all parameter.grad to 0
@@ -138,19 +139,6 @@ def train(args):
             break
 
 
-class Tokenizer:
-    def __init__(self, meta_path: str):
-        
-        with open(meta_path, 'rb') as f:
-            self.meta = pickle.load(f)
-
-    def stoi(self, char: str) -> int:
-        return self.meta["stoi"][char]
-
-    def itos(self, index: int) -> str:
-        return self.meta["itos"][index]
-
-
 class MySampler:
     def __init__(self, books_num: int):
         self.books_num = books_num
@@ -160,13 +148,13 @@ class MySampler:
             yield random.randint(a=0, b=self.books_num)
 
 
-def get_model(model_name: str) -> nn.Module:
+def get_model(model_name: str, vocab_size: int) -> nn.Module:
 
     if model_name == "GPT2":
         from models.gpt2 import GPTConfig, GPT2
         config = GPTConfig(
             block_size=1024,
-            vocab_size=50304,
+            vocab_size=vocab_size,
             n_layer=12,
             n_head=12,
             n_embd=768
@@ -177,7 +165,7 @@ def get_model(model_name: str) -> nn.Module:
         from models.llama import LlamaConfig, Llama
         config = LlamaConfig(
             block_size=1024,
-            vocab_size=50304,
+            vocab_size=vocab_size,
             n_layer=12,
             n_head=12,
             n_embd=768
@@ -185,11 +173,11 @@ def get_model(model_name: str) -> nn.Module:
         return Llama(config=config)
 
     else:
-        raise NotImplementedError(model_name)
+        raise ValueError(model_name)
 
 
-def bce_loss(output: torch.Tensor, target: torch.LongTensor) -> float:
-    r"""
+def ce_loss(output: torch.Tensor, target: torch.LongTensor) -> float:
+    r"""Cross entropy loss.
 
     Args:
         output: (b, t, vocab_size)
@@ -202,8 +190,8 @@ def bce_loss(output: torch.Tensor, target: torch.LongTensor) -> float:
     B, T, V = output.shape
 
     loss = F.cross_entropy(
-        input=output.view(B * T, V), 
-        target=target.view(B * T), 
+        input=output.flatten(0, 1),  # shape: (b*t, vocab_size)
+        target=target.flatten(0, 1),  # shape: (b*t,)
         ignore_index=-1
     )
 
@@ -223,7 +211,7 @@ def validate(
     device = next(model.parameters()).device
 
     # Load tokens
-    tokens = load_text_to_tokens(text_path=text_path, tokenizer=tokenizer, split=split)
+    ids = load_text_to_ids(text_path=text_path, tokenizer=tokenizer, split=split)
 
     losses = []
 
@@ -231,18 +219,19 @@ def validate(
 
         # Fetch data
         bgn = i * seq_len
-        end = (i + 1) * seq_len
+        end = (i + 1) * seq_len + 1
+        clip_ids = ids[bgn : end]  # shape: (t + 1,)
 
-        input_tokens = torch.LongTensor(tokens[None, bgn : end]).to(device)  # (b, t)
-        target_tokens = torch.LongTensor(tokens[None, bgn + 1 : end + 1]).to(device)  # (b, t)
+        input_ids = torch.LongTensor(clip_ids[None, 0 : -1]).to(device)  # (b, t)
+        target_ids = torch.LongTensor(clip_ids[None, 1 :]).to(device)  # (b, t)
 
         # Forward
         with torch.no_grad():
             model.eval()
-            output = model(tokens=input_tokens)  # shape: (b, t, vocab_size)
+            logits = model(ids=input_ids)  # shape: (b, t, vocab_size)
 
         # Calculate loss
-        loss = bce_loss(output=output, target=target_tokens)
+        loss = ce_loss(output=logits, target=target_ids)
         losses.append(loss.item())
 
     return np.mean(losses)

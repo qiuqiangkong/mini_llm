@@ -30,14 +30,14 @@ llama_configs = {
 
 
 class Llama(nn.Module):
-    r"""Llama model. Modified from https://github.com/Lightning-AI/lit-llama/blob/main/lit_llama/model.py"""
+    r"""Llama model."""
 
     def __init__(self, config: LlamaConfig) -> None:
         super().__init__()
 
         self.config = config
 
-        # word text embedding (wte)
+        # Word to embedding
         self.wte = nn.Embedding(config.vocab_size, config.n_embd)
 
         # Transformer blocks
@@ -49,23 +49,23 @@ class Llama(nn.Module):
 
         # Build RoPE cache
         rope = build_rope(
-            seq_len=self.config.block_size,
-            head_dim=self.config.n_embd // self.config.n_head,
-        )  # rope: (t, head_dim/2, 2)
+            seq_len=config.block_size,
+            head_dim=config.n_embd // config.n_head,
+        )  # shape: (t, head_dim/2, 2)
         self.register_buffer(name="rope", tensor=rope)
 
     def _init_weights(self, module: nn.Module) -> None:
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02 / math.sqrt(2 * self.config.n_layer))
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
         elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02 / math.sqrt(2 * self.config.n_layer))
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
 
     def forward(
         self, 
-        tokens: torch.Tensor,
+        ids: torch.LongTensor,
         mask: None | torch.Tensor = None,
     ) -> torch.Tensor:
-        r"""Next token prediction with GPT2.
+        r"""Next ID prediction with Llama.
 
         b: batch_size
         t: time_steps
@@ -73,21 +73,23 @@ class Llama(nn.Module):
         v: vocab_size
 
         Args:
-            tokens: (b, t)
+            IDs: (b, t)
             mask: None | (1, 1, t, t)
 
         Outputs:
             logits: (b, t, v)
         """
         
-        device = tokens.device
-        B, T = tokens.shape
+        device = ids.device
+        B, T = ids.shape
+
+        assert T <= self.config.block_size, "Can not forward sequence of {T} > {self.config.block_size}"
 
         if mask is None:
             mask = build_causal_mask(seq_len=T).to(device)
 
-        # Token embedding
-        x = self.wte(tokens)  # shape: (b, t, d)
+        # IDs embedding
+        x = self.wte(ids)  # shape: (b, t, d)
 
         # Transformer
         for block in self.blocks:
@@ -103,37 +105,38 @@ class Llama(nn.Module):
     @torch.no_grad()
     def generate(
         self, 
-        tokens: torch.LongTensor, 
-        max_new_tokens: int, 
+        ids: torch.LongTensor, 
+        max_new_ids: int, 
         temperature: float = 1.0, 
         top_k: None | int = None
     ):
-        r"""
-        Next token sampling with auto-regression. Make sure to use model.eval()
+        r"""Next ID sampling with auto-regression. Make sure to use model.eval()
 
         b: batch_size
         t: time_steps
         v: vocab_size
 
         Args:
-            tokens: (b, 1)
-            max_new_tokens: int
+            ids: (b, 1)
+            max_new_ids: int
             temperature: float
             top_k: None | int
 
         Returns:
-            tokens: (b, t)
+            new_ids: (b, t), sampled IDs
         """
-        for _ in range(max_new_tokens):
+        input_len = ids.shape[1]
+
+        for _ in range(max_new_ids):
 
             # If the sequence context is growing too long we must crop it at block_size
-            if tokens.shape[1] <= self.config.block_size:
-                prev_tokens = tokens
+            if ids.shape[1] <= self.config.block_size:
+                prev_ids = ids
             else:
-                prev_tokens = tokens[:, -self.config.block_size:]
+                prev_ids = ids[:, -self.config.block_size:]
 
             # Forward
-            logits = self(prev_tokens)  # shape: (b, t, v)
+            logits = self(prev_ids)  # shape: (b, t, v)
 
             # Take the final step logits
             logits = logits[:, -1, :] / temperature  # shape: (b, v)
@@ -146,13 +149,15 @@ class Llama(nn.Module):
             # Convert logits to probabilities
             probs = F.softmax(logits, dim=-1)  # shape: (b, v)
 
-            # Sample the next token
-            next_token = torch.multinomial(probs, num_samples=1)  # shape: (b, 1)
+            # Sample the next ID
+            next_id = torch.multinomial(probs, num_samples=1)  # shape: (b, 1)
 
-            # Append the sampled token to the running tokens and continue
-            tokens = torch.cat((tokens, next_token), dim=1)  # shape: (b, t)
+            # Append the sampled ID to the running IDs and continue
+            ids = torch.cat((ids, next_id), dim=1)  # shape: (b, t)
 
-        return tokens
+        new_ids = ids[:, input_len:]  # shape: (b, t)
+
+        return new_ids
 
 
 class Block(nn.Module):
@@ -189,7 +194,6 @@ class RMSNorm(nn.Module):
 
     Ref: https://github.com/meta-llama/llama/blob/main/llama/model.py
     """
-
     def __init__(self, dim: int, eps: float = 1e-6):
         
         super().__init__()
@@ -230,9 +234,6 @@ class CausalSelfAttention(nn.Module):
         x: torch.Tensor,
         rope: torch.Tensor,
         mask: torch.Tensor,
-        # max_seq_length: int,
-        # input_pos: Optional[torch.Tensor] = None,
-        # kv_cache: Optional[KVCache] = None,
     ) -> torch.Tensor:
         r"""Causal self attention.
 
@@ -249,7 +250,6 @@ class CausalSelfAttention(nn.Module):
         Outputs:
             x: (b, t, d)
         """
-
         B, T, D = x.shape
 
         # Calculate query, key, values
@@ -259,16 +259,16 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.n_head, D // self.n_head)
         q = q.view(B, T, self.n_head, D // self.n_head)
         v = v.view(B, T, self.n_head, D // self.n_head)
-        # q, k, v shapes: (b, t, h, d/h)
+        # q, k, v shapes: (b, t, h, head_dim)
 
         q = apply_rope(q, rope)
         k = apply_rope(k, rope)
-        # q, k shapes: (b, t, h, d/h)
+        # q, k shapes: (b, t, h, head_dim)
 
         k = k.transpose(1, 2)
         q = q.transpose(1, 2)
         v = v.transpose(1, 2)
-        # q, k, v shapes: (b, h, t, d/h)
+        # q, k, v shapes: (b, h, t, head_dim)
 
         # Efficient attention using Flash Attention CUDA kernels
         x = F.scaled_dot_product_attention(
@@ -278,7 +278,7 @@ class CausalSelfAttention(nn.Module):
             attn_mask=mask, 
             dropout_p=0.0
         )
-        # shape: (b, h, t, d/h)
+        # shape: (b, h, t, head_dim)
 
         x = x.transpose(1, 2).contiguous().view(B, T, D)  # shape: (b, t, d)
 

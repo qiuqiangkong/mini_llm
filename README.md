@@ -1,4 +1,4 @@
-# Minimal PyTorch of GPT2, Llama
+# Minimal PyTorch implementation of GPT2 and Llama
 
 This repo provides the minimal PyTorch implementation of GPT2 and Llama.
 
@@ -16,7 +16,7 @@ conda create --name llm python=3.10
 conda activate llm
 
 # Install Python packages dependencies
-sh env.sh
+bash env.sh
 ```
 
 ## 1. Train
@@ -25,7 +25,7 @@ sh env.sh
 CUDA_VISIBLE_DEVICES=0 python train.py --model_name=Llama
 ```
 
-We train the languge model on the Shakespeares dataset with 1 million characters. The training takes around 20 min to train on a single RTX4090. 
+We train the languge model on the Shakespeares dataset with 1 million characters. The training takes around 20 min to train for 10,000 steps on a single RTX4090. 
 
 ![Training & Validation Loss](assets/loss.png)
 
@@ -57,3 +57,7 @@ This repo is benefited from the following repos.
 NanoGPT: https://github.com/karpathy/nanoGPT
 
 Lit-Llama: https://github.com/Lightning-AI/lit-llama
+
+## License
+
+MIT
