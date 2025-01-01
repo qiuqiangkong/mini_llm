@@ -37,7 +37,7 @@ We use Huggingface accelerate library to train the systems on multiple GPUs. tra
 CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --multi_gpu --num_processes 4 train_accelerate.py --model_name=Llama
 ```
 
-<!-- # Using mutliple GPUs can greatly accelerate the training of LLMs. -->
+Then, the training can speed up by 4x times. The code can also train with multiple nodes such as 32 GPUs with 4 nodes.
 
 ## 2. Sample
 
