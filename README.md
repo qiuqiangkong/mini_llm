@@ -1,6 +1,6 @@
 # Minimal PyTorch implementation of GPT2 and Llama
 
-This repo provides the minimal PyTorch implementation of GPT2 and Llama.
+This repository provides the minimal PyTorch implementation of GPT-2 and LLaMA. This repo simplifies the GPT-2 and LLaMA code for easier understanding and usage.
 
 ## 0. Install dependencies
 
