@@ -113,7 +113,7 @@ def train(args):
             
             loss_dict = {}
 
-            for split in ["train", "val"]:
+            for split in ["train", "test"]:
                 loss = validate(
                     text_path=text_path,
                     tokenizer=tokenizer,
@@ -124,11 +124,11 @@ def train(args):
                 loss_dict[split] = loss
 
             print("Train loss: {}".format(loss_dict["train"]))
-            print("Test loss: {}".format(loss_dict["val"]))
+            print("Test loss: {}".format(loss_dict["test"]))
 
             if wandb_log:
                 wandb.log(
-                    data={"train_loss": loss_dict["train"], "test_loss": loss_dict["val"]},
+                    data={"train_loss": loss_dict["train"], "test_loss": loss_dict["test"]},
                     step=step
                 )
 

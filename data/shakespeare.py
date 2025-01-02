@@ -13,7 +13,7 @@ class ShakespeareChar(Dataset):
     def __init__(self,
         text_path: str = "input.txt", 
         tokenizer: object = None,
-        split: Literal["train", "val"] = "train",
+        split: Literal["train", "test"] = "train",
         seq_len: int = 256,
     ):
         super().__init__()
@@ -45,7 +45,7 @@ class ShakespeareChar(Dataset):
 def load_text_to_ids(
     text_path: str, 
     tokenizer: object, 
-    split: Literal["train", "val"]
+    split: Literal["train", "test"]
 ) -> np.ndarray:
     r"""Load a text file and convert characters to tokens."""
 
@@ -59,7 +59,7 @@ def load_text_to_ids(
     if split == "train":
         ids = ids[0 : 1003854]  # Consistent with nanoGPT
 
-    elif split == "val":
+    elif split == "test":
         ids = ids[1003854 :]  # Consistent with nanoGPT
 
     else:

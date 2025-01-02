@@ -105,7 +105,7 @@ def train(args):
 
             loss_dict = {}
 
-            for split in ["train", "val"]:
+            for split in ["train", "test"]:
                 loss = validate(
                     text_path=text_path,
                     tokenizer=tokenizer,
@@ -115,15 +115,14 @@ def train(args):
                 )
                 loss_dict[split] = loss
 
-            print("Train loss: {}".format(loss_dict["train"]))
-            print("Test loss: {}".format(loss_dict["val"]))
-
             if wandb_log:
                 wandb.log(
-                    data={"train_loss": loss_dict["train"], "test_loss": loss_dict["val"]},
+                    data={"train_loss": loss_dict["train"], "test_loss": loss_dict["test"]},
                     step=step
                 )
-            # from IPython import embed; embed(using=False); os._exit(0)
+
+            print("Train loss: {}".format(loss_dict["train"]))
+            print("Test loss: {}".format(loss_dict["test"]))
 
         # Save model
         if step % save_every_n_steps == 0:
@@ -197,7 +196,7 @@ def ce_loss(output: torch.Tensor, target: torch.LongTensor) -> float:
 def validate(
     text_path: str,
     tokenizer: object,
-    split: Literal["train", "val"],
+    split: Literal["train", "test"],
     model: nn.Module,
     seq_len: int,
     valid_steps: int = 100
