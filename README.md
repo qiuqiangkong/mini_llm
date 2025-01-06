@@ -25,7 +25,7 @@ bash env.sh
 CUDA_VISIBLE_DEVICES=0 python train.py --model_name=Llama
 ```
 
-We train the languge model on the Shakespeares dataset with 1 million characters. The training takes around 20 min to train for 10,000 steps on a single RTX4090. 
+We train the languge model on the Shakespeares dataset with 1 million characters. The training takes around 20 min to train for 10,000 steps on a single RTX4090.
 
 ![Training & Validation Loss](assets/loss.png)
 
@@ -34,10 +34,12 @@ We train the languge model on the Shakespeares dataset with 1 million characters
 We use Huggingface accelerate library to train the systems on multiple GPUs. train_accelerate.py just adds a few lines to train.py. Here is an example to run with 4 GPUs:
 
 ```python
-CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --multi_gpu --num_processes 4 train_accelerate.py --model_name=Llama
+accelerate launch --config_file ./train_accelerate_config.yaml train_accelerate.py --model_name=Llama
 ```
 
 Then, the training can speed up by 4x times. The code can also train with multiple nodes such as 32 GPUs with 4 nodes.
+
+You can modify the `./train_accelerate_config.yaml` to customize your training parameters.
 
 ## 2. Sample
 

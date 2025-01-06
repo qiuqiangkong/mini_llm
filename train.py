@@ -18,7 +18,6 @@ from typing_extensions import Literal
 from data.shakespeare import ShakespeareChar, load_text_to_ids
 from data.tokenizers import TokenizerChar
 
-
 def train(args):
 
     # Arguments
