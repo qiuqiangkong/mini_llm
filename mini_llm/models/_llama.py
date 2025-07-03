@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from models.rope import build_rope, apply_rope
+from mini_llm.models._rope import build_rope, apply_rope
 
 
 @dataclass

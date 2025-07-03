@@ -4,7 +4,7 @@ import random
 
 import numpy as np
 from torch.utils.data import Dataset
-from typing_extensions import Literal
+from typing import Literal
 
 
 class ShakespeareChar(Dataset):
@@ -19,27 +19,23 @@ class ShakespeareChar(Dataset):
         super().__init__()
 
         self.seq_len = seq_len
-
-        # Load all texts
         self.ids = load_text_to_ids(text_path=text_path, tokenizer=tokenizer, split=split)
 
     def __getitem__(self, index: int) -> dict:
-        r"""Fetch a clip of IDs for training. The `index` argument is not used 
-        because we use only one book for training."""
+        r"""The `index` argument is not used because we use only one book for training."""
 
         # Randomly sample a position in the book
         idx = random.randint(0, len(self.ids) - self.seq_len - 1)
         
         data = {
-            "id": self.ids[idx : idx + self.seq_len + 1]  # shape: (seq_len + 1,)
+            "input_id": self.ids[idx : idx + self.seq_len],
+            "target_id": self.ids[idx + 1 : idx + self.seq_len + 1]
         }
 
         return data
 
     def __len__(self):
-
-        # We call 1000 steps as an `epoch`
-        return 1000
+        return 1000  # We call 1000 steps as an `epoch`
 
 
 def load_text_to_ids(

@@ -1,6 +1,3 @@
-"""
-Modified from https://github.com/karpathy/nanoGPT/blob/master/model.py
-"""
 from __future__ import annotations
 import math
 import inspect
@@ -24,7 +21,7 @@ class GPTConfig:
 
 class GPT2(nn.Module):
     def __init__(self, config: GPTConfig):
-        r"""GPT2. Modified from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
+        r"""GPT2. Ref: https://github.com/karpathy/nanoGPT/blob/master/model.py"""
 
         super().__init__()
         

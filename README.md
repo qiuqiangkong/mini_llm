@@ -1,8 +1,8 @@
-# Minimal PyTorch implementation of GPT2 and Llama
+# Minimal PyTorch implementation of Llama
 
-This repository provides the minimal PyTorch implementation of GPT-2 and LLaMA. This repo simplifies the GPT-2 and LLaMA code for easier understanding and usage. This repo trains a natural language generation system with 1 million characters and converges in less than 5 minutes.
+This repository provides a minimal PyTorch implementation of LLaMA. It simplifies the LLaMA code [1] for easier understanding and usage. The model trains a natural language generation system on 1 million characters and converges in under 5 minutes.
 
-## 0. Install dependencies
+## 0. Install Dependencies
 
 ```bash
 # Clone the repo
@@ -10,10 +10,10 @@ git clone https://github.com/qiuqiangkong/mini_llm
 cd mini_llm
 
 # Install Python environment
-conda create --name llm python=3.10
+conda create --name mini_llm python=3.10
 
 # Activate environment
-conda activate llm
+conda activate mini_llm
 
 # Install Python packages dependencies
 bash env.sh
@@ -25,19 +25,19 @@ bash env.sh
 CUDA_VISIBLE_DEVICES=0 python train.py --model_name=Llama
 ```
 
-We train the languge model on the Shakespeares dataset with 1 million characters. The training takes around 20 min to train for 10,000 steps on a single RTX4090. 
+We train the language model on the Shakespeare dataset with 1 million characters. Training takes around 20 minutes for 10,000 steps on a single RTX 4090.
 
 ![Training & Validation Loss](assets/loss.png)
 
 ### Train on Multiple GPUs.
 
-We use Huggingface accelerate library to train the systems on multiple GPUs. train_accelerate.py just adds a few lines to train.py. Here is an example to run with 4 GPUs:
+We use the Hugging Face Accelerate library to train on multiple GPUs. Here's an example using 4 GPUs:
 
 ```python
 CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --multi_gpu --num_processes 4 train_accelerate.py --model_name=Llama
 ```
 
-Then, the training can speed up by 4x times. The code can also train with multiple nodes such as 32 GPUs with 4 nodes.
+This speeds up training by 4×. The code also supports multi-node training, such as 32 GPUs across 4 nodes.
 
 ## 2. Sample
 
@@ -60,14 +60,8 @@ It was commanded so willingly I do at ever.
 So fortune
 </pre>
 
-## External links
+## External Links
 
-This repo is benefited from the following repos.
+[1] Lit-Llama: https://github.com/Lightning-AI/lit-llama
 
-NanoGPT: https://github.com/karpathy/nanoGPT
-
-Lit-Llama: https://github.com/Lightning-AI/lit-llama
-
-## License
-
-MIT
+[2] NanoGPT: https://github.com/karpathy/nanoGPT

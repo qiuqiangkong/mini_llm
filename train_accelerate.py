@@ -16,12 +16,14 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing_extensions import Literal
 
-from data.shakespeare import ShakespeareChar, load_text_to_ids
-from data.tokenizers import TokenizerChar
-from train import MySampler, get_model, ce_loss, validate
+from mini_llm.datasets.shakespeare import ShakespeareChar, load_text_to_ids
+from mini_llm.losses import ce_loss
+from mini_llm.samplers import MySampler
+from mini_llm.tokenizers.char import TokenizerChar
+from train import get_model, validate
 
 
-def train(args):
+def train(args) -> None:
 
     # Arguments
     model_name = args.model_name
@@ -31,7 +33,7 @@ def train(args):
     batch_size = 16
     num_workers = 16
     pin_memory = True
-    learning_rate = 1e-4
+    lr = 1e-4
     test_every_n_steps = 200
     save_every_n_steps = 2000
     training_steps = 10000
@@ -41,7 +43,7 @@ def train(args):
     filename = Path(__file__).stem
 
     # Paths
-    root = "./assets/shakespeare_char"
+    root = "./datasets/shakespeare_char"
     text_path = Path(root, "input.txt")
     meta_path = Path(root, "meta.pkl")
 
@@ -77,7 +79,7 @@ def train(args):
     model.to(device)
 
     # Optimizer
-    optimizer = optim.AdamW(params=model.parameters(), lr=learning_rate)
+    optimizer = optim.AdamW(params=model.parameters(), lr=lr)
 
     # Prepare for multiprocessing
     accelerator = Accelerator()
@@ -87,18 +89,18 @@ def train(args):
 
     # Logger
     if wandb_log and accelerator.is_main_process:
-        wandb.init(project="mini_llm", name="{}".format(model_name))
+        wandb.init(project="mini_llm", name=model_name)
 
     # Train
     for step, data in enumerate(tqdm(train_dataloader)):
 
         # Move data to device
-        input_ids = data["id"][:, 0 : -1]  # (b, t)
-        target_ids = data["id"][:, 1 :]  # (b, t)
+        input_ids = data["input_id"]  # (b, l)
+        target_ids = data["target_id"]  # (b, l)
 
         # Forward
         model.train()
-        logits = model(ids=input_ids)  # shape: (b, t, vocab_size)
+        logits = model(ids=input_ids)  # (b, t, vocab_size)
 
         # Loss
         loss = ce_loss(output=logits, target=target_ids)
@@ -134,14 +136,13 @@ def train(args):
 
         # Save model
         if step % save_every_n_steps == 0 and accelerator.is_main_process:
-            ckpt_path = Path(ckpts_dir, "step={}.pth".format(step))
+            ckpt_path = Path(ckpts_dir, f"step={step}.pth")
             torch.save(accelerator.unwrap_model(model).state_dict(), ckpt_path)
-            print("Save model to {}".format(ckpt_path))
+            print(f"Save model to {ckpt_path}")
 
         if step == training_steps:
             break
         
-
 
 if __name__ == "__main__":
 

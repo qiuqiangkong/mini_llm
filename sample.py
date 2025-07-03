@@ -1,17 +1,16 @@
-"""
-Modified from https://github.com/karpathy/nanoGPT/blob/master/sample.py
-"""
 from __future__ import annotations
+
 import argparse
 from pathlib import Path
 
 import torch
 
-from data.tokenizers import TokenizerChar
-from train import TokenizerChar, get_model
+from mini_llm.tokenizers.char import TokenizerChar
+from train import get_model
 
 
 def sample(args):
+    r"""Ref: https://github.com/karpathy/nanoGPT/blob/master/sample.py"""
 
     # Arguments
     model_name = args.model_name
@@ -49,8 +48,7 @@ def sample(args):
                 max_new_ids=max_new_ids, 
                 temperature=temperature, 
                 top_k=top_k
-            )
-            # shape: (b, t)
+            )  # (b, l)
 
         ids = ids[0].cpu().numpy()
         strings = ids_to_text(ids, tokenizer)
@@ -58,7 +56,7 @@ def sample(args):
         print("------------")
 
 
-def ids_to_text(ids, tokenizer):
+def ids_to_text(ids: list, tokenizer) -> str:
     return "".join([tokenizer.itos(id) for id in ids])
 
 
