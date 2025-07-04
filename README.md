@@ -27,7 +27,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py --model_name=Llama
 
 We train the languge model on the Shakespeares dataset with 1 million characters. The training takes around 20 min to train for 10,000 steps on a single RTX4090. 
 
-![Training & Validation Loss](assets/loss.png)
+<img src="https://github.com/user-attachments/assets/4df41f0b-3f40-4bde-818c-3b301a9963cb" width="800">
 
 ### Train on Multiple GPUs.
 
